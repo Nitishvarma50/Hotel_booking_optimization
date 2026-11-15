@@ -1,6 +1,6 @@
 # AI benchmark plan
 
-**Status:** Draft awaiting team approval. No benchmark code has been written yet.
+**Status:** Approved by the Data Lead on 15 November 2026. Benchmark implementation and run output are pending.
 
 ## Prediction
 

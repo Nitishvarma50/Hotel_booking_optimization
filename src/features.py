@@ -123,7 +123,8 @@ def prepare_bookings(df: pd.DataFrame) -> pd.DataFrame:
     - Missing company -> 'unknown'
     - Retain exact duplicate records
     - Remove negative ADR and ADR above 1000
-    - Remove zero-night and zero-guest bookings
+    - Remove zero-night and zero-guest bookings before splitting inputs,
+      targets, and scoring rows, as approved for the scoring population
 
     Returns a new DataFrame without modifying the original.
     """
@@ -183,8 +184,10 @@ def prepare_bookings(df: pd.DataFrame) -> pd.DataFrame:
             .astype(str)
         )
 
-    # Apply the team's current scoring-population exclusions. Calculate guest
-    # count after imputing missing children so the rule is deterministic.
+    # Apply the approved exclusions before creating model, target, and scoring
+    # tables. The scoring denominator therefore uses the filtered population;
+    # see docs/DECISIONS.md for the recorded decision and row counts.
+    # Calculate guests after imputing missing children so the rule is stable.
     guests = (
         bookings["adults"]
         + bookings["children"]
