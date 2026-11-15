@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">Hotel overbooking nightly recommendation architecture</title>
+  <desc id="desc">Historical booking records are prepared, scored by a frozen predictor, aggregated by hotel and arrival night, adjusted by the saved buffer, and written to a CSV for the revenue manager.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L11,6 L1,11 z" fill="#52627a"/>
+    </marker>
+    <style>
+      .bg { fill: #f4f7fb; }
+      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #14243a; }
+      .subtitle { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #53647c; }
+      .node { fill: #fff; stroke: #9cb1cb; stroke-width: 2; rx: 16; }
+      .model { fill: #e9f2ff; stroke: #5786c4; stroke-width: 2; rx: 16; }
+      .output { fill: #e9f8f0; stroke: #55a477; stroke-width: 2; rx: 16; }
+      .label { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #18304e; text-anchor: middle; }
+      .small { font: 400 14px 'Segoe UI', Arial, sans-serif; fill: #53647c; text-anchor: middle; }
+      .arrow { fill: none; stroke: #52627a; stroke-width: 3; marker-end: url(#arrow); }
+      .note { fill: #fff7df; stroke: #dfbd62; stroke-width: 1.5; rx: 12; }
+      .noteText { font: 400 14px 'Segoe UI', Arial, sans-serif; fill: #66521a; }
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="700"/>
+  <text class="title" x="56" y="58">Nightly oversell recommendation</text>
+  <text class="subtitle" x="56" y="88">The command loads a committed predictor and frozen buffer; it never retrains.</text>
+
+  <rect class="node" x="55" y="170" width="205" height="112"/>
+  <text class="label" x="157" y="211">Bookings CSV</text>
+  <text class="small" x="157" y="239">Historical course data</text>
+  <text class="small" x="157" y="260">or supplied export</text>
+
+  <rect class="node" x="335" y="170" width="210" height="112"/>
+  <text class="label" x="440" y="211">Prepare rows</text>
+  <text class="small" x="440" y="239">features.prepare_bookings</text>
+  <text class="small" x="440" y="260">dates, nights, cleaning</text>
+
+  <rect class="model" x="640" y="140" width="225" height="112"/>
+  <text class="label" x="752" y="181">Frozen model bundle</text>
+  <text class="small" x="752" y="209">predictor + feature list</text>
+  <text class="small" x="752" y="230">saved buffer</text>
+
+  <rect class="node" x="640" y="310" width="225" height="112"/>
+  <text class="label" x="752" y="351">Booking probabilities</text>
+  <text class="small" x="752" y="379">predict cancellations</text>
+  <text class="small" x="752" y="400">one probability per row</text>
+
+  <rect class="node" x="940" y="310" width="205" height="112"/>
+  <text class="label" x="1042" y="351">Hotel-night totals</text>
+  <text class="small" x="1042" y="379">sum expected cancellations</text>
+  <text class="small" x="1042" y="400">and estimate spread</text>
+
+  <rect class="output" x="940" y="500" width="205" height="112"/>
+  <text class="label" x="1042" y="541">Recommendations CSV</text>
+  <text class="small" x="1042" y="569">book, expected, buffer</text>
+  <text class="small" x="1042" y="590">oversell, reason</text>
+
+  <rect class="output" x="640" y="500" width="225" height="112"/>
+  <text class="label" x="752" y="541">Revenue manager</text>
+  <text class="small" x="752" y="569">reviews one row per</text>
+  <text class="small" x="752" y="590">hotel and arrival night</text>
+
+  <path class="arrow" d="M260 226 H325"/>
+  <path class="arrow" d="M545 226 H600 V366 H630"/>
+  <path class="arrow" d="M752 252 V300"/>
+  <path class="arrow" d="M865 366 H930"/>
+  <path class="arrow" d="M1042 422 V490"/>
+  <path class="arrow" d="M940 556 H875"/>
+  <path class="arrow" d="M752 422 V490"/>
+
+  <rect class="note" x="55" y="500" width="490" height="112"/>
+  <text class="noteText" x="78" y="535">Historical CSV limitation:</text>
+  <text class="noteText" x="78" y="560">the current preparation function requires the outcome column in the source schema,</text>
+  <text class="noteText" x="78" y="585">although the recommendation code excludes it from model inputs and calculations.</text>
+</svg>
