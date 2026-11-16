@@ -1,5 +1,6 @@
 # Made by running the code, so never committed: the downloaded bookings. The saved model in models/ is committed.
 /data/
+/outputs/
 
 # Made by Python, Jupyter and pytest on every run.
 __pycache__/

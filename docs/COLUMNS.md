@@ -101,4 +101,10 @@ The Model Lead owns these experiments. Do not fill in AUC values until the runs 
 
 Antonio, N., de Almeida, A., & Nunes, L. (2019). *Hotel booking demand datasets*. Data in Brief, 22, 41–49. https://doi.org/10.1016/j.dib.2018.11.126
 
-Relevant evidence: the article's experimental-design section (booking change-log extraction relative to the day before arrival), Table 1 (variable definitions and sources), and the discussion of country/nationality and booking amendments.
+### What the paper supports about feature timing
+
+- The paper's experimental-design section (pp. 42–43) says the data point is the day before arrival and that booking values were taken from the booking change log relative to that date when a change existed. This is not a snapshot of the original booking-day values, so it does not establish that amendable fields kept their initial values.
+- The operations caveat (p. 45) says booking attributes such as guest count, stay duration, and room preference can change at check-in or during the stay. It also says hotels may not know a guest's nationality until check-in. This supports the Bin 2 classifications for amendable fields and Bin 3 for `country`.
+- The paper does not provide evidence to move `country` into a booking-time bin. Therefore the team's 17-column set can remain the agreed experimental feature set, but a rule using all 17 cannot be represented as using only booking-time information or as meeting the rubric's no-late-column condition. The AUC comparison should identify the timing-safe result separately from experiments that use Bin 2 or Bin 3 fields.
+
+Page references above are to the cited article's printed pages (pp. 42–45).
