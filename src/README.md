@@ -14,3 +14,5 @@ The project ends with these two commands working from a fresh Codespace. Commit 
 python src/backtest.py
 python src/nightly.py --from 2017-08-18 --nights 14
 ```
+
+`python src/backtest.py --skip-proof` repeats train/choose selection and saves the policy artifact without scoring proof. Use the default command only for the final backtest, because it also scores the proof period.
