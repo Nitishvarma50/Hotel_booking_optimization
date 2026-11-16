@@ -5,5 +5,6 @@ numpy        # the numbers under pandas and scikit-learn
 scikit-learn==1.9.1   # splits, models and metrics
 matplotlib==3.11.2    # charts for your slides and your evidence folder
 joblib==1.6.0         # saves and loads a fitted model
+xgboost==3.4.1        # learned cancellation model used by src/backtest.py
 pytest==9.1.1         # runs tests/
 ipykernel==7.4.0      # lets VS Code run notebooks
