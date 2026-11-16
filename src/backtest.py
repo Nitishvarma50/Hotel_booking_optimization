@@ -217,6 +217,7 @@ def main(run_proof=True):
                 "Walks": score["walked_guests"],
                 "Walks per 1,000": score["walks_per_1000"],
                 "Ceiling met": score["ceiling_met"],
+                "Nights": score["nights"],
             })
 
         proof_results = pd.DataFrame(proof_rows)
