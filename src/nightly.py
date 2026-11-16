@@ -21,7 +21,7 @@ import features
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_BOOKINGS = data.DATA_DIR / data.FILE
-DEFAULT_MODEL = ROOT / "models" / "selected_model.joblib"
+DEFAULT_MODEL = ROOT / "models" / "chosen_policy.joblib"
 DEFAULT_OUTPUT = ROOT / "outputs" / "nightly_recommendations.csv"
 SCORING_ONLY = {"is_canceled", "arrival_date", "adr", "nights"}
 BUFFER_KINDS = {"rooms", "spread_multiplier"}
@@ -193,7 +193,7 @@ def create_recommendations(
     nightly["book"] = nightly["book"].fillna(0).astype(int)
     nightly[["expected", "spread"]] = nightly[["expected", "spread"]].fillna(0.0)
     nightly["buffer"] = _buffer_by_night(nightly["spread"], buffer)
-    nightly["oversell"] = np.rint(
+    nightly["oversell"] = np.floor(
         np.maximum(0.0, nightly["expected"] - nightly["buffer"])
     ).astype(int)
     if buffer["kind"] == "rooms":
