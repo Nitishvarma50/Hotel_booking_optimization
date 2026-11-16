@@ -49,41 +49,29 @@ The project rubric requires the chosen rule to use only the first bin. A second-
 | `reservation_status` | 3 | Represents the final reservation outcome/status, such as cancelled, checked-out or no-show. | Article, Table 1: last reservation status. |
 | `reservation_status_date` | 3 | Date on which the last reservation status was set; only known when that status event occurs. | Article, Table 1: date associated with the last reservation status. |
 
-## Team-approved feature list and timing conflict
+## Current approved model feature list (supersedes the earlier 17-column list)
 
-The team confirmed that the 17-column list currently implemented in `src/features.py` is the intended project feature list. This is not consistent with the timing register above: it includes Bin 2 fields and `country` (Bin 3). Until the team resolves the underlying timing evidence, this list cannot be represented as booking-time-only or as satisfying the rubric's no-late-column requirement.
+The team decision recorded in `docs/DECISIONS.md` supersedes the earlier 17-column experimental list. The current model and MVP use only these nine Bin 1 features:
 
 ```python
 MODEL_FEATURES = [
     "hotel",
-    "lead_time",
-    "arrival_date_year",
-    "arrival_date_month",
-    "arrival_date_week_number",
-    "arrival_date_day_of_month",
-    "meal",
-    "country",
     "market_segment",
     "distribution_channel",
     "is_repeated_guest",
     "previous_cancellations",
     "previous_bookings_not_canceled",
-    "reserved_room_type",
     "agent",
     "company",
     "customer_type",
 ]
 ```
 
-The code names this list `MODEL_FEATURES`; it is the 17-column team-approved set, not a pure Bin 1 list.
+`arrival_date`, `is_canceled`, `adr`, and `nights` remain scoring/splitting fields and are not model inputs. `is_canceled` is the target; `arrival_date`, `adr`, and `nights` are required by the client scoring contract.
 
-**Timing caveats to carry into implementation and handoff:**
+**Remaining point-in-time limitation:** The timing register classifies the nine fields as Bin 1, but the published CSV is not a guaranteed snapshot of values as first recorded on booking day. Antonio et al. describe extraction relative to the day before arrival. The feature restriction aligns the model with the timing register; operational deployment still needs original booking-time snapshots or equivalent point-in-time evidence.
 
-- `agent` and `company` have substantial missingness in this dataset. The project EDA found 16,340 missing `agent` values and 112,593 missing `company` values. Treat missing as `"unknown"` unless source evidence establishes that it means no agent/company. The paper's null semantics and this CSV's missing-value representation should not be assumed identical.
-- The paper reports that some values were extracted from a change log as of the day before arrival. Consequently, even fields placed in Bin 1 should be checked against the actual operational point-in-time data source before deployment.
-- The current 17-column team-approved list includes `country`, although this audit classifies it as Bin 3 because the article warns it may only become known at check-in.
-- The current list also includes `lead_time`, arrival-date fields, `meal`, and `reserved_room_type`, which this audit classifies as Bin 2 because amendments can change their recorded values.
-- `adr`, `is_canceled`, `reservation_status`, and `reservation_status_date` must not be used as model inputs.
+The earlier 17-column choice, which included seven Bin 2 fields and `country` (Bin 3), is retained as historical context in `docs/DECISIONS.md`; it is no longer the final model feature set.
 
 ## What happens to a method when the late columns go in?
 

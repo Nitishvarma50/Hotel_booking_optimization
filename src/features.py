@@ -13,7 +13,7 @@ Responsibilities:
 Original data is loaded through data.py.
 The client scoring contract in contract.py must never be modified.
 """
-ṣ
+
 import pandas as pd
 
 
@@ -21,29 +21,18 @@ import pandas as pd
 # 1. TEAM-APPROVED PROJECT FEATURE LIST
 # ============================================================
 
-# The team confirmed this 17-column list as the intended project feature set.
-# The timing audit classifies some of these fields as Bin 2 or Bin 3, so this
-# list must not be described as a verified booking-time-only feature set.
-#
-# deposit_type is excluded pending timing verification.
-# The current team-approved set includes Bin 2 and Bin 3 fields; see
-# docs/COLUMNS.md for the unresolved booking-time limitation.
+# Use only columns classified as Bin 1 in docs/COLUMNS.md. The earlier
+# 17-column team feature list was superseded by the decision recorded in
+# docs/DECISIONS.md. The published CSV can still contain later amendments,
+# so Bin 1 does not prove that every value is an original booking-day snapshot.
 
 MODEL_FEATURES = [
     "hotel",
-    "lead_time",
-    "arrival_date_year",
-    "arrival_date_month",
-    "arrival_date_week_number",
-    "arrival_date_day_of_month",
-    "meal",
-    "country",
     "market_segment",
     "distribution_channel",
     "is_repeated_guest",
     "previous_cancellations",
     "previous_bookings_not_canceled",
-    "reserved_room_type",
     "agent",
     "company",
     "customer_type",
@@ -123,7 +112,8 @@ def prepare_bookings(df: pd.DataFrame) -> pd.DataFrame:
     - Missing company -> 'unknown'
     - Retain exact duplicate records
     - Remove negative ADR and ADR above 1000
-    - Remove zero-night and zero-guest bookings
+    - Remove zero-night and zero-guest bookings before splitting inputs,
+      targets, and scoring rows, as approved for the scoring population
 
     Returns a new DataFrame without modifying the original.
     """
@@ -183,8 +173,10 @@ def prepare_bookings(df: pd.DataFrame) -> pd.DataFrame:
             .astype(str)
         )
 
-    # Apply the team's current scoring-population exclusions. Calculate guest
-    # count after imputing missing children so the rule is deterministic.
+    # Apply the approved exclusions before creating model, target, and scoring
+    # tables. The scoring denominator therefore uses the filtered population;
+    # see docs/DECISIONS.md for the recorded decision and row counts.
+    # Calculate guests after imputing missing children so the rule is stable.
     guests = (
         bookings["adults"]
         + bookings["children"]
@@ -209,7 +201,7 @@ def split_model_inputs(bookings: pd.DataFrame):
     """
     Separate prepared bookings into:
 
-    X: Team-approved model features (timing caveats are documented in docs/COLUMNS.md).
+    X: The current nine Bin 1 model features listed in docs/COLUMNS.md.
     y: Cancellation target.
     scoring: Columns required by the client contract.
 
@@ -235,7 +227,7 @@ def split_model_inputs(bookings: pd.DataFrame):
             f"Missing scoring columns: {missing_scoring}"
         )
 
-    # Model inputs: the team's approved 17-column project feature list.
+    # Model inputs: the current nine-column Bin 1 feature list.
     X = bookings[MODEL_FEATURES].copy()
 
     # Target: actual cancellation outcome.

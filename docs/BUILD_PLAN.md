@@ -1,14 +1,14 @@
 # How do we get from a first test to something the client can run?
 
-**Owner:** Build Lead. Hours are planning estimates; fill actual hours as the team works. Proof-period values remain pending until the Model Lead's run.
+**Owner:** Build Lead. Hours are planning estimates; fill actual hours as the team works. Proof-period values are recorded in `docs/DECISIONS.md` after the nine-feature run.
 
 | Stage | What is built | Owner | Hours planned | Hours used | Done when | Evidence file |
 |---|---|---|---:|---:|---|---|
-| POC | Flat rule, lookup, and at least two learned methods; choose buffers without using proof | Model Lead | 9 (estimate) | Not recorded | One backtest command prints the same-contract method table and ceiling status; chosen artifact saved | `src/backtest.py`, `models/selected_model.joblib`, `evidence/poc_table.png` |
-| MVP | CLI reads bookings and saved predictor/buffer, then writes the requested hotel-night recommendations | Build Lead | 8 (estimate) | Not recorded | `python src/nightly.py --from 2017-08-18 --nights 14` writes and prints the table without retraining; it excludes target/scoring fields from inputs and discloses feature timing. The rubric's first-bin requirement remains open while the 17-column set contains later-known fields. | `src/nightly.py`, `evidence/slide07_nightly_run.png` |
+| POC | Flat rule, lookup, and at least two learned methods; choose buffers without using proof | Model Lead | 9 (estimate) | Not recorded | One backtest command prints the same-contract method table and ceiling status; chosen artifact saved | `src/backtest.py`, `models/chosen_policy.joblib`, `evidence/poc_table.png` |
+| MVP | CLI reads bookings and saved predictor/buffer, then writes the requested hotel-night recommendations | Build Lead | 8 (estimate) | Not recorded | `python src/nightly.py --from 2017-08-18 --nights 14` writes and prints the table without retraining; it excludes target/scoring fields from inputs and discloses feature timing. The current rule uses nine Bin 1 fields; original booking-day snapshots remain a production data requirement. | `src/nightly.py`, `evidence/slide07_nightly_run.png` |
 | Final | Integration, architecture and operational caveat; compare buffer choices if the team has four members | Build Lead with Model and Data Leads | 5 (estimate) | Not recorded | Fresh checkout can run the committed artifact; proof values are reproducible; full-book caveat and roadmap are presented | `docs/PRD.md`, `docs/architecture.svg`, `docs/ROADMAP.md`, `evidence/slide07_architecture.png` |
 
-The current 17-feature decision includes seven Bin 2 and one Bin 3 field. Therefore the MVP is not rubric-complete as a booking-time rule until the team resolves that timing conflict or explicitly records the accepted rubric risk; do not describe it as first-bin-only.
+The earlier 17-feature decision has been superseded by the nine-feature first-bin model. The CSV does not guarantee original booking-day snapshots, so verify point-in-time values before production.
 
 ## What would production add that the MVP leaves out?
 

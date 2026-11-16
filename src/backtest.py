@@ -2,8 +2,9 @@
 
 Run from the project root with: python src/backtest.py
 
-The script follows the team's approved 17-feature set. Its timing caveat is recorded in
-docs/DECISIONS.md and docs/COLUMNS.md. Do not change settings after inspecting proof results.
+The script uses the nine Bin 1 features listed in src/features.py. Its timing caveat is
+recorded in docs/DECISIONS.md and docs/COLUMNS.md. Do not change settings after
+inspecting proof results.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
@@ -171,6 +173,7 @@ def main(run_proof=True):
                 "Parameters": params if isinstance(params, str) else json.dumps(params, sort_keys=True),
                 "Buffer": int(buffer),
                 "Cost (EUR)": score["cost_eur"],
+                "Nights": score["nights"],
                 "Empty rooms": score["empty_rooms"],
                 "Walks": score["walked_guests"],
                 "Walks per 1,000": score["walks_per_1000"],
@@ -213,6 +216,7 @@ def main(run_proof=True):
                 "Method": name,
                 "Buffer": int(row["Buffer"]),
                 "Cost (EUR)": score["cost_eur"],
+                "Nights": score["nights"],
                 "Empty rooms": score["empty_rooms"],
                 "Walks": score["walked_guests"],
                 "Walks per 1,000": score["walks_per_1000"],
@@ -232,23 +236,26 @@ def main(run_proof=True):
     winner = best_by_method.sort_values("Cost (EUR)").iloc[0]
     winner_name = winner["Model"]
     winner_id = winner["_candidate_id"]
+    if winner_name in {"Decision Tree", "XGBoost"}:
+        predictor = Pipeline([
+            ("preprocessor", preprocessor),
+            ("classifier", fitted_models[winner_id]),
+        ])
+    else:
+        raise ValueError(f"No nightly inference adapter is defined for {winner_name}.")
+
     artifact = {
         "method": winner_name,
-        "buffer": int(winner["Buffer"]),
+        "buffer": {"kind": "rooms", "value": int(winner["Buffer"])},
         "parameters": winner["Parameters"],
         "feature_columns": features.MODEL_FEATURES,
-        "preprocessor": preprocessor,
-        "estimator": fitted_models.get(winner_id),
-        "hotel_rates": flat_rates.to_dict() if winner_name == "Flat rule" else None,
-        "lookup_rates": lookup_rates.to_dict() if winner_name == "Lookup" else None,
-        "global_rate": float(np.mean(y_train)),
-        "buffer_definition": BUFFER_DESCRIPTION,
+        "predictor": predictor,
     }
     models_dir = PROJECT_DIR / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / "chosen_policy.joblib"
     joblib.dump(artifact, model_path)
-    print(f"\nSelected on choose: {winner_name}; buffer={artifact['buffer']}")
+    print(f"\nSelected on choose: {winner_name}; k={artifact['buffer']['value']}")
     print(f"Saved policy artifact: {model_path.relative_to(PROJECT_DIR)}")
 
 

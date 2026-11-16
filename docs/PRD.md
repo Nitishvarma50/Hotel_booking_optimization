@@ -12,7 +12,7 @@ The course data contains the final book for historical nights. It does not repre
 
 We compare the client's flat hotel cancellation-rate rule, a lookup rule, and at least two learned models. The Model Lead fits methods on the train period and chooses each method's buffer using the choose period. The chosen method must meet the ceiling of 10 walked guests per 1,000 arrivals on choose; among feasible candidates, select the lowest-cost option on choose. Run proof once after choices are frozen.
 
-The MVP will load the method saved by `src/backtest.py`; it will not retrain. The actual winning method and the condition that would make the team switch to another feasible method remain pending the Model Lead's backtest. If no candidate meets the ceiling on choose, the safe fallback is to oversell zero rooms and report that the candidate methods failed the acceptance rule.
+The MVP will load the method saved by `src/backtest.py`; it will not retrain. The current choose-period winner is XGBoost (depth 4, learning rate 0.05, 200 trees) with a fixed 4-room buffer. It is selected from candidates that met the choose ceiling. If no candidate meets the ceiling on choose, the safe fallback is to oversell zero rooms and report that the candidate methods failed the acceptance rule.
 
 ## 3. What is our answer to the wish-list item?
 
@@ -36,7 +36,7 @@ The command writes a CSV and prints the same table. Missing hotel-nights in the 
 
 ## 5. Which inputs do we use, by bin?
 
-The current team-approved feature list has 17 fields. Per `docs/COLUMNS.md`, its timing is 9 Bin 1 fields (`hotel`, `market_segment`, `distribution_channel`, `is_repeated_guest`, `previous_cancellations`, `previous_bookings_not_canceled`, `agent`, `company`, `customer_type`), 7 Bin 2 fields (`lead_time`, the four arrival-date parts, `meal`, `reserved_room_type`), and 1 Bin 3 field (`country`). The team has recorded that it accepts this timing risk. It must not be described as a booking-time-only feature set; this remains a rubric and deployment risk.
+The current model uses only the nine Bin 1 fields listed in `docs/COLUMNS.md`: `hotel`, `market_segment`, `distribution_channel`, `is_repeated_guest`, `previous_cancellations`, `previous_bookings_not_canceled`, `agent`, `company`, and `customer_type`. The earlier 17-field choice is superseded. The published CSV may still contain later amendments, so original booking-day snapshots are needed to prove point-in-time availability.
 
 `is_canceled` is the target, never a model input. `adr`, `nights`, and the derived `arrival_date` support filtering, grouping, or the client scoring contract; they are not model inputs. The selected model artifact must state its exact feature list. The command rejects an artifact that requests fields outside `features.MODEL_FEATURES` or includes the target/scoring fields.
 
@@ -44,9 +44,9 @@ The historical source file includes cancellation outcomes. The nightly recommend
 
 ## 6. Where do the numbers come from, and how is the buffer set and frozen?
 
-The fitted predictor gives one cancellation probability per booking. The command sums those probabilities by hotel and arrival night. The buffer was selected on the choose period, then saved with the fitted predictor. It may be a fixed number of rooms or a multiplier of the nightly cancellation spread; the saved artifact records which kind it is and its value. The recommendation is `max(0, round(expected - buffer))`, as a whole number.
+The fitted predictor gives one cancellation probability per booking. The command sums those probabilities by hotel and arrival night. The buffer was selected on the choose period, then saved with the fitted predictor. It may be a fixed number of rooms or a multiplier of the nightly cancellation spread; the saved artifact records which kind it is and its value. The recommendation is `max(0, floor(expected - buffer))`, as a whole number, matching the backtest scoring rule.
 
-Integration contract for `models/selected_model.joblib`:
+Integration contract for `models/chosen_policy.joblib`:
 
 ```python
 {
@@ -62,12 +62,12 @@ The pipeline must include any fitted preprocessing, so inference applies the sam
 
 ## 7. What is the error bill on the proof period?
 
-These figures are intentionally pending until the Model Lead runs `python src/backtest.py` using the frozen settings and the project scoring contract.
+These figures come from the nine-feature run of `.venv\Scripts\python.exe src/backtest.py` using the project scoring contract. The choose-selected XGBoost settings and buffer are frozen before proof scoring.
 
-| Rule | Empty rooms | Walked guests | Walks per 1,000 | Cost (EUR) | Monthly saving vs flat rule (EUR) |
+| Rule | Empty rooms | Walked guests | Walks per 1,000 | Cost (EUR) | Saving vs flat rule (EUR) |
 |---|---:|---:|---:|---:|---:|
-| Client's flat rule | Pending | Pending | Pending | Pending | 0 |
-| Selected rule | Pending | Pending | Pending | Pending | Pending |
+| Client's flat rule | 8,141 | 154 | 6.21 | 3,929,135.35 | 0 |
+| XGBoost, depth 4, learning rate 0.05, 200 trees, buffer 4 | 5,607 | 57 | 2.30 | 2,722,668.35 | 1,206,467.00 |
 
 Every comparison must state the filtered scoring population recorded in `docs/DECISIONS.md`. Costs from different populations are not directly comparable.
 
@@ -77,11 +77,11 @@ Every comparison must state the filtered scoring population recorded in `docs/DE
 flowchart LR
     A[Historical bookings CSV] --> B[features.prepare_bookings]
     B --> C[Select saved feature columns]
-    D[models/selected_model.joblib] --> E[Load fitted predictor and frozen buffer]
+    D[models/chosen_policy.joblib] --> E[Load fitted predictor and frozen buffer]
     C --> E
     E --> F[Predict cancellation probability per booking]
     F --> G[Sum probabilities per hotel-night]
-    G --> H[Subtract buffer, round, floor at zero]
+    G --> H[Subtract buffer and floor at zero]
     H --> I[Print and write nightly CSV]
     I --> J[Revenue manager reviews recommendation]
 ```
@@ -92,10 +92,10 @@ The diagram is also saved as `docs/architecture.svg`. It describes the historica
 
 - The source is historical data for two anonymized Portuguese hotels, not a live hotel-system feed.
 - The nightly command demonstrates requested historical dates; it does not model which reservations are on the book at a real future decision time.
-- The accepted 17-feature list includes Bin 2 and Bin 3 fields. It is not safe to claim booking-time-only performance.
+- The current nine-feature list follows the Bin 1 timing register. The published dataset still does not guarantee original booking-day snapshots, so point-in-time availability needs verification.
 - The approved cleaning filters remove 827 rows before scoring. Results apply to that logged population, not all 119,390 source rows.
 - No room-capacity field is present. The tool outputs an oversell count, not a capacity or total-inventory recommendation.
-- Method, buffer, proof costs, AUCs, and walk rate are pending the Model Lead's completed backtest.
+- The reported proof cost and walk rate are from the frozen nine-feature backtest; the AUC values are notebook classification diagnostics and are not the cost-selection objective.
 
 ## 10. What could go wrong?
 
@@ -103,7 +103,7 @@ The diagram is also saved as `docs/architecture.svg`. It describes the historica
 - The model or buffer may be missing or malformed. The command stops with an actionable error rather than silently using a default.
 - Cancellation patterns may shift by season or hotel. The team must report proof-period results and monitor performance before any live use.
 - The walk ceiling is a portfolio-level evaluation rule; individual nights can still have walks. The output is a recommendation, not a guarantee.
-- The timing risk in the 17-column list can make apparent performance unavailable at the real decision time. Resolve this before production.
+- The source may contain later amendments to fields treated as Bin 1. Obtain original booking-time snapshots before production.
 - The full-book historical evaluation overstates how much inventory is known 14 days ahead; the current booking-snapshot gap is a roadmap item.
 
 ## 11. What is out of scope?
