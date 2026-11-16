@@ -28,7 +28,7 @@ One row per hotel and arrival night, with:
 | `arrival_date` | Arrival night |
 | `book` | Number of bookings in the supplied file for that hotel-night |
 | `expected` | Sum of predicted cancellation probabilities for those bookings |
-| `buffer` | Frozen safety buffer, expressed in rooms for this night |
+| `buffer` | Frozen whole-room safety buffer selected on the choose period |
 | `oversell` | Non-negative whole-room recommendation after subtracting the buffer |
 | `reason` | Short explanation of the expected cancellations and buffer used |
 
@@ -44,21 +44,24 @@ The historical source file includes cancellation outcomes. The nightly recommend
 
 ## 6. Where do the numbers come from, and how is the buffer set and frozen?
 
-The fitted predictor gives one cancellation probability per booking. The command sums those probabilities by hotel and arrival night. The buffer was selected on the choose period, then saved with the fitted predictor. It may be a fixed number of rooms or a multiplier of the nightly cancellation spread; the saved artifact records which kind it is and its value. The recommendation is `max(0, round(expected - buffer))`, as a whole number.
+The selected policy gives one cancellation probability per booking. The command sums those probabilities by hotel and arrival night. The buffer is a whole number of rooms selected on the choose period and saved with the policy. The recommendation is `max(0, floor(expected - buffer))`, matching the backtest scoring rule.
 
-Integration contract for `models/selected_model.joblib`:
+Integration contract for `models/chosen_policy.joblib`:
 
 ```python
 {
-    "predictor": fitted_pipeline,  # exposes predict_proba(X)[:, 1]
-    "feature_columns": [...],     # ordered input columns used to fit it
-    "method": "method name",
-    "buffer": {"kind": "rooms", "value": 2.0},
-    # or {"kind": "spread_multiplier", "value": 1.0}
+    "method": "Flat rule | Lookup | Decision Tree | XGBoost",
+    "buffer": 2,                   # whole rooms, selected on choose
+    "feature_columns": [...],      # ordered input columns
+    "preprocessor": fitted_encoder,
+    "estimator": fitted_model,     # learned methods; None for rate rules
+    "hotel_rates": {...},          # training rates and fallback
+    "lookup_rates": {...},         # training rates and fallback
+    "global_rate": 0.37,
 }
 ```
 
-The pipeline must include any fitted preprocessing, so inference applies the same encoding as training. The Model Lead owns writing this artifact from `src/backtest.py`; the Build Lead owns reading it from `src/nightly.py`.
+The Model Lead owns writing this artifact from `src/backtest.py`; the Build Lead owns reading it from `src/nightly.py`. The nightly command applies the saved encoder to learned methods and uses saved training rates for the flat and lookup rules. It never fits or updates the policy.
 
 ## 7. What is the error bill on the proof period?
 
@@ -77,7 +80,7 @@ Every comparison must state the filtered scoring population recorded in `docs/DE
 flowchart LR
     A[Historical bookings CSV] --> B[features.prepare_bookings]
     B --> C[Select saved feature columns]
-    D[models/selected_model.joblib] --> E[Load fitted predictor and frozen buffer]
+    D[models/chosen_policy.joblib] --> E[Load saved method and frozen buffer]
     C --> E
     E --> F[Predict cancellation probability per booking]
     F --> G[Sum probabilities per hotel-night]
@@ -99,7 +102,7 @@ The diagram is also saved as `docs/architecture.svg`. It describes the historica
 
 ## 10. What could go wrong?
 
-- A saved model may expect a different feature order or preprocessing. The command validates the feature list and requires a fitted pipeline.
+- A saved policy may expect a different feature order or preprocessing. The command validates the feature list and requires the saved fitted preprocessor and estimator for learned methods.
 - The model or buffer may be missing or malformed. The command stops with an actionable error rather than silently using a default.
 - Cancellation patterns may shift by season or hotel. The team must report proof-period results and monitor performance before any live use.
 - The walk ceiling is a portfolio-level evaluation rule; individual nights can still have walks. The output is a recommendation, not a guarantee.

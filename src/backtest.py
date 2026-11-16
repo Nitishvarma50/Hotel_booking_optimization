@@ -240,8 +240,10 @@ def main(run_proof=True):
         "feature_columns": features.MODEL_FEATURES,
         "preprocessor": preprocessor,
         "estimator": fitted_models.get(winner_id),
-        "hotel_rates": flat_rates.to_dict() if winner_name == "Flat rule" else None,
-        "lookup_rates": lookup_rates.to_dict() if winner_name == "Lookup" else None,
+        # Keep both fallback tables in every artifact so nightly inference can
+        # reproduce the same fallbacks if the flat or lookup rule was selected.
+        "hotel_rates": flat_rates.to_dict(),
+        "lookup_rates": lookup_rates.to_dict(),
         "global_rate": float(np.mean(y_train)),
         "buffer_definition": BUFFER_DESCRIPTION,
     }

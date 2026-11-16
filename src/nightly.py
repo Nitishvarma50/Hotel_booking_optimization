@@ -1,7 +1,7 @@
-"""Write cancellation-aware oversell recommendations from a frozen model bundle.
+"""Write cancellation-aware oversell recommendations from a frozen policy.
 
 The backtest owns fitting and buffer selection. This command only loads the
-saved predictor and its frozen buffer, then writes one recommendation per
+saved policy, applies it without fitting, and writes one recommendation per
 hotel and requested arrival night.
 """
 
@@ -21,10 +21,10 @@ import features
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_BOOKINGS = data.DATA_DIR / data.FILE
-DEFAULT_MODEL = ROOT / "models" / "selected_model.joblib"
+DEFAULT_MODEL = ROOT / "models" / "chosen_policy.joblib"
 DEFAULT_OUTPUT = ROOT / "outputs" / "nightly_recommendations.csv"
 SCORING_ONLY = {"is_canceled", "arrival_date", "adr", "nights"}
-BUFFER_KINDS = {"rooms", "spread_multiplier"}
+RATE_METHODS = {"Flat rule", "Lookup"}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -66,7 +66,7 @@ def _read_bookings(path: pathlib.Path) -> pd.DataFrame:
 
 def _load_bundle(
     path: pathlib.Path,
-) -> tuple[object, list[str], dict[str, float | str], str]:
+) -> tuple[dict, list[str], int, str]:
     if not path.is_file():
         raise FileNotFoundError(
             f"Saved model bundle not found: {path}. Run src/backtest.py first; "
@@ -75,18 +75,17 @@ def _load_bundle(
 
     bundle = joblib.load(path)
     if not isinstance(bundle, dict):
-        raise ValueError("Model bundle must be a dictionary with predictor, feature_columns, and buffer.")
+        raise ValueError("Saved policy must be a dictionary.")
 
-    missing = {"predictor", "feature_columns", "buffer", "method"} - set(bundle)
+    missing = {"method", "buffer", "feature_columns"} - set(bundle)
     if missing:
         raise ValueError(f"Model bundle is missing required keys: {sorted(missing)}")
 
-    predictor = bundle["predictor"]
-    if not callable(getattr(predictor, "predict_proba", None)):
-        raise ValueError("Saved predictor must expose predict_proba(X).")
     method = bundle["method"]
     if not isinstance(method, str) or not method.strip():
         raise ValueError("Model bundle method must be a non-empty string.")
+    if method not in RATE_METHODS | {"Decision Tree", "XGBoost"}:
+        raise ValueError(f"Unsupported saved method: {method}")
 
     columns = bundle["feature_columns"]
     if not isinstance(columns, (list, tuple)) or not columns or not all(
@@ -102,30 +101,78 @@ def _load_bundle(
     if unknown:
         raise ValueError(f"Saved model requests columns outside features.MODEL_FEATURES: {sorted(unknown)}")
 
-    buffer = bundle["buffer"]
-    if not isinstance(buffer, dict) or not {"kind", "value"}.issubset(buffer):
-        raise ValueError("buffer must contain kind and value.")
-    kind = buffer["kind"]
-    if kind not in BUFFER_KINDS:
-        raise ValueError(f"buffer kind must be one of {sorted(BUFFER_KINDS)}.")
-    value = float(buffer["value"])
-    if not np.isfinite(value) or value < 0:
-        raise ValueError("buffer value must be a finite, non-negative number.")
+    try:
+        buffer_value = float(bundle["buffer"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Saved buffer must be a whole number of rooms.") from exc
+    if not np.isfinite(buffer_value) or buffer_value < 0 or not buffer_value.is_integer():
+        raise ValueError("Saved buffer must be a finite, non-negative whole number of rooms.")
 
-    return predictor, list(columns), {"kind": kind, "value": value}, method
+    if method in RATE_METHODS:
+        for rate_key in ("hotel_rates", "lookup_rates"):
+            if not isinstance(bundle.get(rate_key), dict):
+                raise ValueError(f"Saved rate-based policy is missing its {rate_key} table.")
+        try:
+            global_rate = float(bundle.get("global_rate", np.nan))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Rate-based policy is missing a valid global_rate fallback.") from exc
+        if not np.isfinite(global_rate) or not 0 <= global_rate <= 1:
+            raise ValueError("global_rate must be a probability between 0 and 1.")
+    else:
+        if not callable(getattr(bundle.get("preprocessor"), "transform", None)):
+            raise ValueError("Saved learned policy is missing its fitted preprocessor.")
+        if not callable(getattr(bundle.get("estimator"), "predict_proba", None)):
+            raise ValueError("Saved learned policy is missing its fitted estimator.")
+
+    return bundle, list(columns), int(buffer_value), method
 
 
-def _buffer_by_night(spread: pd.Series, buffer: dict[str, float | str]) -> pd.Series:
-    if buffer["kind"] == "rooms":
-        return pd.Series(float(buffer["value"]), index=spread.index)
-    return spread * float(buffer["value"])
+def _probabilities_for_bookings(
+    selected: pd.DataFrame, bundle: dict, feature_columns: list[str]
+) -> np.ndarray:
+    """Apply the saved learned model or training-rate rule without fitting."""
+    if selected.empty:
+        return np.array([], dtype=float)
+
+    method = bundle["method"]
+    if method == "Flat rule":
+        rates = bundle["hotel_rates"]
+        probabilities = np.array([
+            rates.get(hotel, bundle["global_rate"])
+            for hotel in selected["hotel"]
+        ], dtype=float)
+    elif method == "Lookup":
+        lookup_rates = bundle["lookup_rates"]
+        hotel_rates = bundle.get("hotel_rates") or {}
+        fallback = bundle["global_rate"]
+        probabilities = np.array([
+            lookup_rates.get(
+                (hotel, segment), hotel_rates.get(hotel, fallback)
+            )
+            for hotel, segment in zip(selected["hotel"], selected["market_segment"])
+        ], dtype=float)
+    else:
+        estimator = bundle["estimator"]
+        transformed = bundle["preprocessor"].transform(selected[feature_columns])
+        raw = np.asarray(estimator.predict_proba(transformed), dtype=float)
+        if raw.ndim != 2 or raw.shape[0] != len(selected):
+            raise ValueError("Saved estimator returned an invalid probability matrix.")
+        classes = np.asarray(getattr(estimator, "classes_", []))
+        positive_class = np.flatnonzero(classes == 1)
+        if len(positive_class) != 1 or raw.shape[1] <= int(positive_class[0]):
+            raise ValueError("Saved estimator must expose exactly one cancellation class labeled 1.")
+        probabilities = raw[:, int(positive_class[0])]
+
+    if not np.isfinite(probabilities).all() or ((probabilities < 0) | (probabilities > 1)).any():
+        raise ValueError("Saved policy returned probabilities outside [0, 1].")
+    return probabilities
 
 
 def create_recommendations(
     raw_bookings: pd.DataFrame,
-    predictor: object,
+    bundle: dict,
     feature_columns: list[str],
-    buffer: dict[str, float | str],
+    buffer: int,
     start_date: str,
     nights: int = 14,
 ) -> pd.DataFrame:
@@ -151,27 +198,7 @@ def create_recommendations(
         bookings["arrival_date"].between(dates[0], dates[-1]), selected_columns
     ].copy()
 
-    if selected.empty:
-        predictions = np.array([], dtype=float)
-    else:
-        probabilities = np.asarray(
-            predictor.predict_proba(selected[feature_columns]), dtype=float
-        )
-        if probabilities.ndim != 2 or probabilities.shape != (len(selected), 2):
-            raise ValueError(
-                "predict_proba must return an (n_bookings, 2) array; "
-                "the cancellation probability is column 1."
-            )
-        classes = getattr(predictor, "classes_", None)
-        if classes is not None:
-            positive_class = np.flatnonzero(np.asarray(classes) == 1)
-            if len(positive_class) != 1:
-                raise ValueError("Saved predictor must have exactly one class labeled 1 (cancelled).")
-            predictions = probabilities[:, int(positive_class[0])]
-        else:
-            predictions = probabilities[:, 1]
-        if not np.isfinite(predictions).all() or ((predictions < 0) | (predictions > 1)).any():
-            raise ValueError("Predictor returned probabilities outside [0, 1].")
+    predictions = _probabilities_for_bookings(selected, bundle, feature_columns)
 
     scored = selected[["hotel", "arrival_date"]].copy()
     scored["_probability"] = predictions
@@ -192,14 +219,11 @@ def create_recommendations(
     nightly = nightly.reindex(full_index)
     nightly["book"] = nightly["book"].fillna(0).astype(int)
     nightly[["expected", "spread"]] = nightly[["expected", "spread"]].fillna(0.0)
-    nightly["buffer"] = _buffer_by_night(nightly["spread"], buffer)
-    nightly["oversell"] = np.rint(
+    nightly["buffer"] = int(buffer)
+    nightly["oversell"] = np.floor(
         np.maximum(0.0, nightly["expected"] - nightly["buffer"])
     ).astype(int)
-    if buffer["kind"] == "rooms":
-        buffer_reason = f"{float(buffer['value']):.2f}-room fixed"
-    else:
-        buffer_reason = f"{float(buffer['value']):.2f} x spread"
+    buffer_reason = f"{int(buffer)}-room fixed"
     nightly["reason"] = nightly.apply(
         lambda row: (
             f"Expected {row['expected']:.2f} cancellations; subtract "
@@ -222,10 +246,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         pd.Timestamp(args.start_date)  # fail early on an invalid date
         raw_bookings = _read_bookings(args.bookings)
-        predictor, feature_columns, buffer, method = _load_bundle(args.model)
+        bundle, feature_columns, buffer, method = _load_bundle(args.model)
         table = create_recommendations(
             raw_bookings,
-            predictor,
+            bundle,
             feature_columns,
             buffer,
             args.start_date,

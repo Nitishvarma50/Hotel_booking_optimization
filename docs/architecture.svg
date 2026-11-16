@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
   <title id="title">Hotel overbooking nightly recommendation architecture</title>
-  <desc id="desc">Historical booking records are prepared, scored by a frozen predictor, aggregated by hotel and arrival night, adjusted by the saved buffer, and written to a CSV for the revenue manager.</desc>
+  <desc id="desc">Historical booking records are prepared, scored by a frozen saved policy, aggregated by hotel and arrival night, adjusted by the saved buffer, and written to a CSV for the revenue manager.</desc>
   <defs>
     <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
       <path d="M1,1 L11,6 L1,11 z" fill="#52627a"/>
@@ -21,7 +21,7 @@
   </defs>
   <rect class="bg" width="1200" height="700"/>
   <text class="title" x="56" y="58">Nightly oversell recommendation</text>
-  <text class="subtitle" x="56" y="88">The command loads a committed predictor and frozen buffer; it never retrains.</text>
+  <text class="subtitle" x="56" y="88">The command loads the committed policy and frozen buffer; it never retrains.</text>
 
   <rect class="node" x="55" y="170" width="205" height="112"/>
   <text class="label" x="157" y="211">Bookings CSV</text>
@@ -35,8 +35,8 @@
 
   <rect class="model" x="640" y="140" width="225" height="112"/>
   <text class="label" x="752" y="181">Frozen model bundle</text>
-  <text class="small" x="752" y="209">predictor + feature list</text>
-  <text class="small" x="752" y="230">saved buffer</text>
+  <text class="small" x="752" y="209">chosen method + feature list</text>
+  <text class="small" x="752" y="230">saved whole-room buffer</text>
 
   <rect class="node" x="640" y="310" width="225" height="112"/>
   <text class="label" x="752" y="351">Booking probabilities</text>
