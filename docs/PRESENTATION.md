@@ -17,7 +17,7 @@ Ten minutes, ten slides, then six minutes of questions on Saturday.
 | 1 | Client Lead | 45 | What should the revenue manager do tomorrow night? | The nightly table for the next fourteen nights, with one sentence above it |
 | 2 | Client Lead | 45 | What is decided, and what do the two wrong calls cost? | The frame sentence and the metric tree, with the north star and the ceiling |
 | 3 | Client Lead and Data Lead | 75 | What did the data say that the brief did not? | The check of the brief's numbers, your answer to observation 1 with the question you sent the client, and the travel-partner view of rate against volume |
-| 4 | Data Lead | 60 | Which columns did the hotel know on the day of booking? | The three-bin audit, and the three AUCs from `docs/COLUMNS.md` |
+| 4 | Data Lead | 60 | Which columns did the hotel know on the day of booking, and how did timing affect AUC? | Three-bin audit and ablation: 9 Bin 1 features AUC 0.7543; adding seven Bin 2 fields raises it to 0.7833; adding `country` (Bin 3) raises it to 0.8315. Show the 95% paired-bootstrap intervals and explain the timing limit. Run C (0.8046) is a random holdout, not proof. See `evidence/feature_timing_eda.png` and `docs/COLUMNS.md`. |
 | 5 | Model Lead | 75 | Which method wins, and under which measure? | The method table from `python src/backtest.py` on the proof period |
 | 6 | Model Lead | 45 | What would flip the choice? | Buffer against walks on the choose period, and one changed condition |
 | 7 | Build Lead | 90 | Does it run? | A live run of the MVP command, and the architecture diagram |

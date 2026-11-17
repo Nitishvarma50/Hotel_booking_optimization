@@ -14,6 +14,7 @@ import sys
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.pipeline import Pipeline
 
 import data
 import features
@@ -25,6 +26,7 @@ DEFAULT_MODEL = ROOT / "models" / "chosen_policy.joblib"
 DEFAULT_OUTPUT = ROOT / "outputs" / "nightly_recommendations.csv"
 SCORING_ONLY = {"is_canceled", "arrival_date", "adr", "nights"}
 BUFFER_KINDS = {"rooms", "spread_multiplier"}
+LEGACY_ROOM_BUFFER_DESCRIPTION = "whole rooms subtracted from expected cancellations"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -77,11 +79,24 @@ def _load_bundle(
     if not isinstance(bundle, dict):
         raise ValueError("Model bundle must be a dictionary with predictor, feature_columns, and buffer.")
 
-    missing = {"predictor", "feature_columns", "buffer", "method"} - set(bundle)
+    missing = {"feature_columns", "buffer", "method"} - set(bundle)
     if missing:
         raise ValueError(f"Model bundle is missing required keys: {sorted(missing)}")
 
-    predictor = bundle["predictor"]
+    if "predictor" in bundle:
+        predictor = bundle["predictor"]
+    elif {"preprocessor", "estimator"}.issubset(bundle):
+        # Older committed backtest artifacts stored these fitted pieces separately.
+        predictor = Pipeline([
+            ("preprocessor", bundle["preprocessor"]),
+            ("estimator", bundle["estimator"]),
+        ])
+    else:
+        raise ValueError(
+            "Model bundle must contain a fitted 'predictor', or both fitted "
+            "'preprocessor' and 'estimator' objects."
+        )
+
     if not callable(getattr(predictor, "predict_proba", None)):
         raise ValueError("Saved predictor must expose predict_proba(X).")
     method = bundle["method"]
@@ -103,7 +118,20 @@ def _load_bundle(
         raise ValueError(f"Saved model requests columns outside features.MODEL_FEATURES: {sorted(unknown)}")
 
     buffer = bundle["buffer"]
-    if not isinstance(buffer, dict) or not {"kind", "value"}.issubset(buffer):
+    if not isinstance(buffer, dict):
+        # Compatibility for the committed legacy artifact, whose metadata makes
+        # clear that its integer buffer is measured in whole rooms.
+        if bundle.get("buffer_definition") != LEGACY_ROOM_BUFFER_DESCRIPTION:
+            raise ValueError(
+                "A numeric buffer is accepted only when buffer_definition "
+                "identifies whole rooms."
+            )
+        value = float(buffer)
+        if not np.isfinite(value) or value < 0 or not value.is_integer():
+            raise ValueError("Legacy whole-room buffer must be a non-negative integer.")
+        buffer = {"kind": "rooms", "value": value}
+
+    if not {"kind", "value"}.issubset(buffer):
         raise ValueError("buffer must contain kind and value.")
     kind = buffer["kind"]
     if kind not in BUFFER_KINDS:

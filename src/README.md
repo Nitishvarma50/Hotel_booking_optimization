@@ -20,5 +20,5 @@ python src/nightly.py --from 2017-08-18 --nights 14
 
 ## What does `nightly.py` expect from the backtest?
 
-Save `models/selected_model.joblib` as a dictionary with `predictor`, `feature_columns`, `method`, and `buffer`. `predictor` must be a fitted pipeline exposing `predict_proba(X)` and must include all fitted preprocessing. `feature_columns` is the ordered input list. `buffer` is either `{"kind": "rooms", "value": N}` or `{"kind": "spread_multiplier", "value": N}`; it is chosen on the choose period and frozen before proof. `nightly.py` loads this artifact and never fits or updates it.
+Save `models/chosen_policy.joblib` as a dictionary with `predictor`, `feature_columns`, `method`, and `buffer`. `predictor` must be a fitted pipeline exposing `predict_proba(X)` and must include all fitted preprocessing. `feature_columns` is the ordered input list. `buffer` is either `{"kind": "rooms", "value": N}` or `{"kind": "spread_multiplier", "value": N}`; it is chosen on the choose period and frozen before proof. `nightly.py` loads this artifact and never fits or updates it. It also reads the older committed format containing separate `preprocessor` and `estimator` fields with an explicitly documented whole-room buffer.
  main

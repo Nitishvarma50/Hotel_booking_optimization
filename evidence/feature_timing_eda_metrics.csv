@@ -1,0 +1,5 @@
+Model,Features,Train rows,Evaluation rows,Split,AUC,95% CI low,95% CI high,95% CI method
+9 · Bin 1 only,9,48747,40509,Chronological proof,0.754298,0.749411,0.758502,"Stratified row bootstrap, 500 replicates"
+16 · Bin 1 + Bin 2,16,48747,40509,Chronological proof,0.783313,0.778848,0.787801,"Stratified row bootstrap, 500 replicates"
+17 · plus country (Bin 3),17,48747,40509,Chronological proof,0.831520,0.827902,0.834737,"Stratified row bootstrap, 500 replicates"
+9 · random holdout,9,94850,23713,"Stratified random 80/20, seed 42",0.804567,0.799072,0.810093,"Stratified row bootstrap, 500 replicates"

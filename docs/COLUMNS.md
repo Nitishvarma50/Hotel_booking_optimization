@@ -75,13 +75,19 @@ The earlier 17-column choice, which included seven Bin 2 fields and `country` (B
 
 ## What happens to a method when the late columns go in?
 
-The Model Lead owns these experiments. Do not fill in AUC values until the runs have been completed and the evaluation outputs have been supplied.
+The Model Lead owns these experiments. The recorded runs below use the final XGBoost settings selected on the choose period (`max_depth=4`, `learning_rate=0.05`, `n_estimators=200`, `random_state=42`). No settings were selected or changed using proof results. All runs use the same cleaning filters; 827 rows are excluded, leaving 118,563 prepared rows.
 
-| Run | Columns | Split | AUC on the proof period |
-|---|---|---|---|
-| A | First bin only | Time | Pending — Model Lead |
-| B | All three bins | Time | Pending — Model Lead |
-| C | First bin only | Random | Pending — Model Lead |
+| Run | Columns | Evaluation split | Train / evaluation rows | AUC |
+|---|---|---|---:|---:|
+| A | First bin only (9 features) | Chronological train / proof | 48,747 / 40,509 | 0.7543 |
+| B | Historical 17-feature set (7 Bin 2 fields plus `country` in Bin 3) | Chronological train / proof | 48,747 / 40,509 | 0.8315 |
+| C | First bin only (9 features) | Stratified random 80/20 split, seed 42 | 94,850 / 23,713 | 0.8046 |
+
+Run A and B use the train period to fit and the proof period to evaluate. Run C is a random-split diagnostic and its AUC is on the random holdout, not the proof period. Run B uses the exact historical 17-feature list from the earlier project version; it includes seven Bin 2 fields and `country` in Bin 3, while excluding the target and scoring-only fields. It is a timing-risk comparison, not the current approved model. All three runs use the frozen choose-selected XGBoost settings above. Reproduce them with `python src/auc_comparison.py`.
+
+## Feature-group ablation for slide 4
+
+To show where the 17-feature AUC gain comes from, the same frozen model was fit with 9 Bin 1 features, then 16 features (adding the seven Bin 2 fields), then the historical 17 (adding `country`). On the same 40,509 proof bookings, AUCs were **0.7543**, **0.7833**, and **0.8315**, respectively. Stratified paired-bootstrap 95% intervals for the AUC gains were: seven Bin 2 fields, **+0.0290** (0.0264 to 0.0322); `country`, **+0.0482** (0.0437 to 0.0523); all eight timing-risk fields together, **+0.0772** (0.0731 to 0.0817). Intervals quantify row-sampling uncertainty for these frozen models; they do not prove when the hotel knew each value or account for repeated analysis of this proof period. See `evidence/feature_timing_eda.md` and `evidence/feature_timing_eda.png` for the full analysis and limitations.
 
 **Which result should the client believe?** Run A is the relevant result for the intended booking-time decision, provided the temporal split and feature timestamps are valid. Run B is a leakage diagnostic, not a deployable result, because it includes information unavailable at booking. Run C is a random-split diagnostic and may overstate future performance by mixing time periods. The Model Lead should report the actual AUCs and explain the gap; no values are assumed here.
 
@@ -93,6 +99,6 @@ Antonio, N., de Almeida, A., & Nunes, L. (2019). *Hotel booking demand datasets*
 
 - The paper's experimental-design section (pp. 42–43) says the data point is the day before arrival and that booking values were taken from the booking change log relative to that date when a change existed. This is not a snapshot of the original booking-day values, so it does not establish that amendable fields kept their initial values.
 - The operations caveat (p. 45) says booking attributes such as guest count, stay duration, and room preference can change at check-in or during the stay. It also says hotels may not know a guest's nationality until check-in. This supports the Bin 2 classifications for amendable fields and Bin 3 for `country`.
-- The paper does not provide evidence to move `country` into a booking-time bin. Therefore the team's 17-column set can remain the agreed experimental feature set, but a rule using all 17 cannot be represented as using only booking-time information or as meeting the rubric's no-late-column condition. The AUC comparison should identify the timing-safe result separately from experiments that use Bin 2 or Bin 3 fields.
+- The paper does not provide evidence to move `country` into a booking-time bin. The earlier 17-column set is retained as historical experimental context, not as the current approved feature set. Any result using Bin 2 or Bin 3 fields must be reported separately from the current nine-feature timing-safe comparison; Run B above is the historical 17-feature diagnostic.
 
 Page references above are to the cited article's printed pages (pp. 42–45).
